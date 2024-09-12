@@ -5,6 +5,8 @@ import (
 	"encoding/csv"
 	"flag"
 	"fmt"
+	"image"
+	"image/png"
 	"io"
 	"math"
 	"math/rand"
@@ -106,6 +108,7 @@ func sigmoid_prime(m mat.Matrix) mat.Matrix {
 }
 
 func (net *Network) train(inputData []float64, target_data []float64) {
+
 	// forward propagation
 	inputs := mat.NewDense(len(inputData), 1, inputData)
 	hidden_inputs := dot(net.hidden_weights, inputs)
@@ -132,14 +135,16 @@ func (net *Network) train(inputData []float64, target_data []float64) {
 
 // The part (net Network) is called the method receiver. It defines the type that the method is associated with. In this case, net is the receiver variable of type Network. By defining a method with a receiver, you can access the fields and methods of the Network instance within the method.
 func (net Network) predict(input_data []float64) mat.Matrix {
+
 	// forward propagation: input_data goes into matrix inputs
 	inputs := mat.NewDense(len(input_data), 1, input_data)
+
 	// standard multiplication being performed on inputs matrix with hidden_weights in net struct
 	hidden_inputs := dot(net.hidden_weights, inputs)
 	hidden_outputs := apply(sigmoid, hidden_inputs)
 	final_inputs := dot(net.output_weights, hidden_outputs)
 	final_outputs := apply(sigmoid, final_inputs)
-	format(final_outputs)
+	//format(final_outputs)
 	return final_outputs
 }
 
@@ -165,46 +170,45 @@ func create_network(input, hidden, output int, rate float64) (net Network) {
 	net.output_weights = mat.NewDense(net.outputs, net.hiddens, random_array(net.hiddens*net.outputs, float64(net.hiddens)))
 	fmt.Println("Network Created: ")
 	fmt.Println("Hidden Weights: ")
-	format(net.hidden_weights)
+	//format(net.hidden_weights)
 	fmt.Println("Output Weights: ")
-	format(net.output_weights)
+	//format(net.output_weights)
 	return
 }
 
 func save(net Network) {
 	h, err := os.Create("hweights.model")
-	defer h.Close()
 	if err == nil {
 		net.hidden_weights.MarshalBinaryTo(h)
 	}
+	defer h.Close()
 	if err != nil {
 		fmt.Println("Error saving model", err)
 	}
 	o, err := os.Create("oweights.model")
-	defer o.Close()
 	if err == nil {
 		net.output_weights.MarshalBinaryTo(o)
 	}
+	defer o.Close()
 	if err != nil {
 		fmt.Println("Error saving model", err)
 	}
 }
 
-// load a neural network from file
 func load(net *Network) {
 	h, err := os.Open("hweights.model")
-	defer h.Close()
 	if err == nil {
 		net.hidden_weights.Reset()
 		net.hidden_weights.UnmarshalBinaryFrom(h)
 	}
+	defer h.Close()
 	o, err := os.Open("oweights.model")
-	defer o.Close()
 	if err == nil {
 		net.output_weights.Reset()
 		net.output_weights.UnmarshalBinaryFrom(o)
 	}
-	return
+	defer o.Close()
+	//return
 }
 
 func mnist_train(net *Network) {
@@ -281,25 +285,80 @@ func mnist_predict(net *Network) {
 	fmt.Println("score:", score)
 	accuracy := float64(score) / 10000.0
 	fmt.Println("Accuracy: ", accuracy)
+	log_file, err := os.OpenFile("logs.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		fmt.Println("Error opening log file:", err)
+		return
+	}
+	defer log_file.Close()
+
+	writer := bufio.NewWriter(log_file)
+	log_entry := fmt.Sprintf("Network: (%d,%d,%d,%f) ", net.inputs, net.hiddens, net.outputs, net.learning_rate) + fmt.Sprintf("Time taken: %s, Score: %d, Accuracy: %.4f\n", elapsed, score, accuracy)
+	writer.WriteString(log_entry)
+	writer.Flush()
+}
+
+func data_from_image(file_path string) (pixels []float64) {
+
+	img_file, err := os.Open(file_path)
+	if err != nil {
+		fmt.Println("Cannot read file:", err)
+	}
+	defer img_file.Close()
+
+	img, err := png.Decode(img_file)
+	if err != nil {
+		fmt.Println("Cannot decode file:", err)
+	}
+
+	bounds := img.Bounds()
+	gray := image.NewGray(bounds)
+
+	for x := 0; x < bounds.Max.X; x++ {
+		for y := 0; y < bounds.Max.Y; y++ {
+			var rgba = img.At(x, y)
+			gray.Set(x, y, rgba)
+		}
+	}
+
+	pixels = make([]float64, len(gray.Pix))
+	for i := 0; i < len(gray.Pix); i++ {
+		pixels[i] = (float64(255-gray.Pix[i]) / 255.0 * 0.99) + 0.01
+	}
+	return
+}
+
+func predict_from_image(net Network, path string) (int, int) {
+	input := data_from_image(path)
+	output := net.predict(input)
+	format(output)
+
+	best := -1
+	second_best := -1
+	highest := 0.0
+	second_highest := 0.0
+
+	for i := 0; i < net.outputs; i++ {
+		probability := output.At(i, 0)
+		if probability > highest {
+			second_best = best
+			second_highest = highest
+
+			best = i
+			highest = probability
+		} else if probability > second_highest {
+			second_best = i
+			second_highest = probability
+		}
+	}
+
+	return best, second_best
 }
 
 func main() {
-	// var choice int
-	// net := create_network(784, 100, 10, 0.4)
-	// fmt.Println("Enter your choice (1:train/2:test) ")
-	// fmt.Scanf("%d", &choice)
-	// switch choice {
-	// case 1:
-	// 	//train the model
-	// 	mnist_train(&net)
-	// 	save(net)
-	// case 2:
-	// 	//test the model
-	// 	load(&net)
-	// 	mnist_predict(&net)
-	// }
-	net := create_network(784, 100, 10, 0.1)
+	net := create_network(784, 200, 10, 0.1)
 	mnist := flag.String("mnist", "", "Either train or predict to evaluate neural network")
+	file := flag.String("file", "", "File name of 28 x 28 PNG file to evaluate")
 	flag.Parse()
 
 	switch *mnist {
@@ -309,5 +368,10 @@ func main() {
 	case "predict":
 		load(&net)
 		mnist_predict(&net)
+	}
+	if *file != "" {
+		load(&net)
+		best, second_best := predict_from_image(net, *file)
+		fmt.Println("\nPrediction:", best, second_best)
 	}
 }

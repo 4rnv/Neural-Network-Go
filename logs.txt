@@ -1,0 +1,9 @@
+Network: (784,10,10,0.100000) Time taken: 2.4022206s, Score: 8745, Accuracy: 0.8745
+Network: (784,10,10,0.900000) Time taken: 2.3746173s, Score: 8746, Accuracy: 0.8746
+Network: (784,10,10,0.050000) Time taken: 2.6698673s, Score: 8833, Accuracy: 0.8833
+Network: (784,20,10,0.050000) Time taken: 3.0938297s, Score: 9223, Accuracy: 0.9223
+Network: (784,20,10,0.100000) Time taken: 2.9202392s, Score: 9320, Accuracy: 0.9320
+Network: (784,100,10,0.100000) Time taken: 10.4109229s, Score: 9695, Accuracy: 0.9695
+Network: (784,200,10,0.100000) Time taken: 9.0611616s, Score: 9740, Accuracy: 0.9740
+Network: (784,200,10,0.050000) Time taken: 8.2260955s, Score: 9739, Accuracy: 0.9739
+Network: (784,100,10,0.100000) Time taken: 5.6221829s, Score: 9695, Accuracy: 0.9695
